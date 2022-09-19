@@ -9,6 +9,7 @@ import type {
 import { LoadStats } from '../loader/load-stats';
 
 const AGE_HEADER_LINE_REGEX = /^age:\s*[\d.]+\s*$/m;
+declare var Vividas;
 
 class XhrLoader implements Loader<LoaderContext> {
   private xhrSetup: Function | null;
@@ -170,31 +171,46 @@ class XhrLoader implements Loader<LoaderContext> {
           );
           let data;
           let len: number;
+
+          const resolve = (dataChunk, finalLen) => {
+            stats.loaded = stats.total = finalLen;
+
+            if (!this.callbacks) {
+              return;
+            }
+            const onProgress = this.callbacks.onProgress;
+            if (onProgress) {
+              onProgress(stats, context, dataChunk, xhr);
+            }
+            if (!this.callbacks) {
+              return;
+            }
+            const response = {
+              url: xhr.responseURL,
+              data: dataChunk,
+            };
+
+            this.callbacks.onSuccess(response, stats, context, xhr);
+          }
+
           if (context.responseType === 'arraybuffer') {
-            data = xhr.response;
-            len = data.byteLength;
+            console.log('Response headers', xhr.getAllResponseHeaders());
+            const vividas = new Vividas({
+              streamType: 'VOD'
+            });
+
+            // data = xhr.response;
+            // len = data.byteLength;
+            vividas.decrypt(xhr.response).then((decryptedData => {
+              resolve(decryptedData, decryptedData.byteLength);
+            })).catch((error) => {
+              console.log('Error decrypting segment', error);
+            });
           } else {
             data = xhr.responseText;
             len = data.length;
+            resolve(data, len);
           }
-          stats.loaded = stats.total = len;
-
-          if (!this.callbacks) {
-            return;
-          }
-          const onProgress = this.callbacks.onProgress;
-          if (onProgress) {
-            onProgress(stats, context, data, xhr);
-          }
-          if (!this.callbacks) {
-            return;
-          }
-          const response = {
-            url: xhr.responseURL,
-            data: data,
-          };
-
-          this.callbacks.onSuccess(response, stats, context, xhr);
         } else {
           // if max nb of retries reached or if http status between 400 and 499 (such error cannot be recovered, retrying is useless), return error
           if (
