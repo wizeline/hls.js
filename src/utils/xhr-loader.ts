@@ -10,7 +10,6 @@ import { LoadStats } from '../loader/load-stats';
 
 const AGE_HEADER_LINE_REGEX = /^age:\s*[\d.]+\s*$/m;
 declare let Vividas;
-declare let STREAM_TYPE;
 
 class XhrLoader implements Loader<LoaderContext> {
   private xhrSetup: Function | null;
@@ -208,10 +207,7 @@ class XhrLoader implements Loader<LoaderContext> {
               headersMap[header] = value;
             });
 
-            const vividas = new Vividas({
-              // eslint-disable-next-line
-              streamType: STREAM_TYPE || 'VOD',
-            });
+            const vividas = Vividas.getInstance();
 
             // data = xhr.response;
             // len = data.byteLength;
@@ -221,7 +217,7 @@ class XhrLoader implements Loader<LoaderContext> {
                 resolve(decryptedData, decryptedData.byteLength);
               })
               .catch((error) => {
-                console.log('Error decrypting segment', error);
+                console.error('Error decrypting segment', error);
               });
           } else {
             data = xhr.responseText;
