@@ -9,7 +9,8 @@ import type {
 import { LoadStats } from '../loader/load-stats';
 
 const AGE_HEADER_LINE_REGEX = /^age:\s*[\d.]+\s*$/m;
-declare var Vividas;
+declare let Vividas;
+declare let STREAM_TYPE;
 
 class XhrLoader implements Loader<LoaderContext> {
   private xhrSetup: Function | null;
@@ -191,21 +192,37 @@ class XhrLoader implements Loader<LoaderContext> {
             };
 
             this.callbacks.onSuccess(response, stats, context, xhr);
-          }
+          };
 
           if (context.responseType === 'arraybuffer') {
-            console.log('Response headers', xhr.getAllResponseHeaders());
+            /**
+             * Creates a map with all the response headers from the request
+             */
+            const headers = xhr.getAllResponseHeaders();
+            const headersArray = headers.trim().split(/[\r\n]+/);
+            const headersMap = {};
+            headersArray.forEach(function (line) {
+              const parts = line.split(': ');
+              const header: any = parts.shift();
+              const value = parts.join(': ');
+              headersMap[header] = value;
+            });
+
             const vividas = new Vividas({
-              streamType: 'VOD'
+              // eslint-disable-next-line
+              streamType: STREAM_TYPE || 'VOD',
             });
 
             // data = xhr.response;
             // len = data.byteLength;
-            vividas.decrypt(xhr.response).then((decryptedData => {
-              resolve(decryptedData, decryptedData.byteLength);
-            })).catch((error) => {
-              console.log('Error decrypting segment', error);
-            });
+            vividas
+              .decrypt(xhr.response, headersMap)
+              .then((decryptedData) => {
+                resolve(decryptedData, decryptedData.byteLength);
+              })
+              .catch((error) => {
+                console.log('Error decrypting segment', error);
+              });
           } else {
             data = xhr.responseText;
             len = data.length;
