@@ -12,6 +12,7 @@ import { type HlsConfig, RetryConfig } from '../config';
 import { getRetryDelay, shouldRetry } from './error-helper';
 
 const AGE_HEADER_LINE_REGEX = /^age:\s*[\d.]+\s*$/im;
+declare let Vividas;
 
 class XhrLoader implements Loader<LoaderContext> {
   private xhrSetup:
@@ -236,7 +237,23 @@ class XhrLoader implements Loader<LoaderContext> {
             code: status,
           };
 
-          this.callbacks.onSuccess(response, stats, context, xhr);
+          if (xhr.responseType === 'arraybuffer') {
+            const self = this;
+            const vividas = Vividas.getInstance();
+
+            vividas
+              .decrypt(data)
+              .then((decryptedData) => {
+                response.data = decryptedData;
+                stats.loaded = stats.total = decryptedData.byteLength;
+                self?.callbacks?.onSuccess(response, stats, context, xhr);
+              })
+              .catch((error) => {
+                console.error('Error decrypting segment', error);
+              });
+          } else {
+            this.callbacks.onSuccess(response, stats, context, xhr);
+          }
         } else {
           const retryConfig = config.loadPolicy.errorRetry;
           const retryCount = stats.retry;
